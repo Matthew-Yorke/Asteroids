@@ -47,8 +47,8 @@
 		</Compiler>
 		<Unit filename="Asteroid.h" />
 		<Unit filename="Game.h" />
-		<Unit filename="Laser.h" />
 		<Unit filename="Ship.h" />
+		<Unit filename="Weapon.h" />
 		<Unit filename="main.cpp" />
 		<Extensions>
 			<code_completion />

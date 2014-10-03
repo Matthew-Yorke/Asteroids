@@ -12,8 +12,8 @@
 #include <cmath>
 #include <sstream>
 #include <list>
+#include "Weapon.h"
 #include "Ship.h"
-#include "Laser.h"
 #include "Asteroid.h"
 
 class Game {
@@ -33,17 +33,13 @@ class Game {
         int   level;        //Tracks current level
         int   lives;        //Tracks number of player lives
         int   countdown;    //Countdown for a level to start
-        float energy;       //Energy the player has available
         bool  doneLevel;    //Loop for the individual level
         bool  doneGame;     //Loop for the entire game
         bool  setTimer;     //Allows timer to happen
         bool  initGame;
-        int   shipFrameY;   //Sets ships y frame
-        int   shipFrameX;   //Sets ships x frame
-        int   shipFrameXTimer;
 
         //Objects
-        std::list<Laser*>    lasers;
+        std::list<Weapon*>   weapons;
         std::list<Asteroid*> asteroids;
         Ship* player;
 
@@ -79,15 +75,8 @@ Game* Game::Instance() {
 int Game::Init() {
     //Intialize game settings
     score = 0;          //Start score at 0
-    level = 1;          //Start at level 1
+    level = 2;          //Start at level 1
     lives = 3;          //Start with 3 lives
-    energy = 100;       //Start with max energy
-    shipFrameY = 0;     //Start at ships idle y frame
-    shipFrameX = 0;     //Start at ships idle x frame
-    shipFrameXTimer = 15;
-    doneLevel = false;  //Init Level loop
-    doneGame = false;   //Init Game loop
-    setTimer = true;    //set the levels timer
 
     //Start random number generator
     srand(time(NULL));
@@ -167,12 +156,15 @@ void Game::MainLoop() {
     ALLEGRO_EVENT ev;
 
     //Local Variables
-    bool left = false;
-    bool right = false;
-    bool forwrd = false;
+    bool left;
+    bool right;
+    bool forwrd;
     bool drawgfx;
 
     while(!doneGame){
+        left = false;
+        right = false;
+        forwrd = false;
         initLevel();
 
         //Main Loop
@@ -192,28 +184,33 @@ void Game::MainLoop() {
                 }
                 //Key presses
                 else if(ev.type == ALLEGRO_EVENT_KEY_DOWN) {
-                    if(ev.keyboard.keycode == ALLEGRO_KEY_W) {
-                        shipFrameX = 0;
+                    if(ev.keyboard.keycode == ALLEGRO_KEY_W)
                         forwrd = true;
-                    }
                     if(ev.keyboard.keycode == ALLEGRO_KEY_A) {
-                        if(right != true){
-                            shipFrameX = 0;
+                        if(right != true)
                             left = true;
-                        }
                     }
                     if(ev.keyboard.keycode == ALLEGRO_KEY_D) {
-                        shipFrameX = 0;
-                        if(left != true){
-                            shipFrameX = 0;
+                        if(left != true)
                             right = true;
-                        }
+                    }
+                    if(ev.keyboard.keycode == ALLEGRO_KEY_R) {
+                        if(player->getRocketCount() > 0)
+                            weapons.push_back(player->fireRocket());
+                    }
+                    //Level skip for testing...DELETE AFTER FINISHED
+                    if(ev.keyboard.keycode == ALLEGRO_KEY_V) {
+                        doneLevel = true;
+                        level++;
+                        if(level > 5)
+                            doneGame = true;
+                        weapons.clear();
+                        asteroids.clear();
+                        break;
                     }
                     if(ev.keyboard.keycode == ALLEGRO_KEY_SPACE) {
-                        if(energy - 50 >= 0) {
-                            energy -= 50;
-                            Laser* l = new Laser(player->getXCoord(), player->getYCoord(), player->getDegreeAngle());
-                            lasers.push_back(l);
+                        if(player->getEnergy() - 50 >= 0) {
+                            weapons.push_back(player->fireLaser());
                         }
                     }
                     if(ev.keyboard.keycode == ALLEGRO_KEY_ESCAPE) {
@@ -236,64 +233,16 @@ void Game::MainLoop() {
                         break;
                     }
                     if(ev.timer.source == timer) {
-                        //Update Ship
-                        if(left == true) {
-                            shipFrameY = 96;
-                            if(shipFrameXTimer == 0) {
-                                shipFrameX += 32;
-                                if(shipFrameX > 32)
-                                    shipFrameX = 0;
-                            shipFrameXTimer = 15;
-                            }
-                            else
-                                shipFrameXTimer--;
-                            player->turnLeft();
-                        }
-                        if(right == true){
-                            shipFrameY = 48;
-                            if(shipFrameXTimer == 0) {
-                                shipFrameX += 32;
-                                if(shipFrameX > 32)
-                                    shipFrameX = 0;
-                                shipFrameXTimer = 15;
-                            }
-                            else
-                                shipFrameXTimer--;
-                            player->turnRight();
-                        }
-                        if(forwrd == true) {
-                            shipFrameY = 144;
-                            if(left != true && right != true) {
-                                if(shipFrameXTimer == 0) {
-                                    shipFrameX += 32;
-                                    if(shipFrameX > 32)
-                                        shipFrameX = 0;
-                                    shipFrameXTimer = 15;
-                                }
-                                else
-                                    shipFrameXTimer--;
-                            }
-                            player->moveForward();
-                        }
-                        if(left != true && right != true && forwrd != true) {
-                            shipFrameY = 0;
-                            shipFrameX = 0;
-                        }
+                        player->update(left, right, forwrd);
 
-                        //Refill Energy
-                        if(energy < 100)
-                            energy += 1;
-                        if(energy > 100)
-                            energy = 100;
-
-                        //Updates Laser List
-                        std::list<Laser*>::iterator it;
-                        for(it = lasers.begin(); it != lasers.end(); ++it) {
-                            (*it)->moveForward();
+                        //Updates Weapon List
+                        std::list<Weapon*>::iterator itWeap;
+                        for(itWeap = weapons.begin(); itWeap != weapons.end(); ++itWeap) {
+                            (*itWeap)->moveForward();
                             //Remove out of bounds laser
-                            if((*it)->getXCoord() < 0 || (*it)->getXCoord() > 800 || (*it)->getYCoord() < 0 || (*it)->getYCoord() > 600) {
-                                (*it)->~Laser();
-                                lasers.erase(it++);
+                            if((*itWeap)->getXCoord() < 0 || (*itWeap)->getXCoord() > 800 || (*itWeap)->getYCoord() < 0 || (*itWeap)->getYCoord() > 600) {
+                                (*itWeap)->~Weapon();
+                                weapons.erase(itWeap++);
                             }
                         }
 
@@ -323,58 +272,133 @@ void Game::MainLoop() {
 }
 
 void Game::initLevel() {
-    int x, y, ang;
+    doneLevel = false;  //Init Level loop
+    doneGame = false;   //Init Game loop
+    setTimer = true;    //set the levels timer
+
+    int x, y, ang, spd;
     //TO DO: Create Algorithm for how many asteroids per level
-    int largeAst = 5;
-    int medAst = 0;
-    int smallAst = 0;
+    int lrgAst = level + 3;     //Add 1 more Large asteroid every level (starting at 4)
+    int medAst = 0.5 * level;   //Add 2 more asteroid every other level (starting at 0)
+    int smlAst = 0.25 * level;  //Add 1 more small asteroid every 4 levels (starting at 0)
+    bool add;
+    std::list<Asteroid*>::iterator astIt;
 
     //Place Large Asteroids on the level field
-    for(int i = 0; i < largeAst; i++) {
+    for(int i = 0; i < lrgAst; i++) {
         //Set asteroid parameters randomly on the field (xCoord, yCoord, angle)
         x = rand() % 800;
         y = rand() % 600;
         ang = rand() % 360;
+        spd = (rand() % 3) + 1;
+        add = true;
 
         //If outside the safe zone add
-        if((x < 300 || x > 500) || (y < 200 || y > 400)) {
-            Asteroid* ast = new Asteroid(x, y, ang);
-            asteroids.push_back(ast);
+        if((x < 300 || x > 500) || (y < 150 || y > 450)) {
+            //Create a new asteroid to add to the list
+            Asteroid* ast = new Asteroid(x, y, ang, spd, "Large");
+            //Check all asteroids in asteroids list
+            for(astIt = asteroids.begin(); astIt != asteroids.end(); ++astIt) {
+                //Add new asteroid to the list if it does not overlap the previous
+                if(!((ast->getXCoord() < (*astIt)->getXCoord()-128 ||
+                   ast->getXCoord() > (*astIt)->getXCoord()+128) ||
+                   (ast->getYCoord() < (*astIt)->getYCoord()-128 ||
+                   ast->getYCoord() > (*astIt)->getYCoord()+128)))
+                {
+                    delete ast;     //free memory
+                    add = false;    //don't allow adding of the new asteroid
+                    break;          //break out of checking if asteroids collide
+                }
+            }
+            //Add new asteroid if it did not overlap the current asteroids
+            if(add == true)
+                asteroids.push_back(ast);
+            //Add another pass if the new asteroid did overlap a current asteroid
+            else
+                i--;
         }
-        //if collide with another asteroid retry
-        //else retry a new position
+        //If within the safe zone add another pass to add the asteroid
+        else
+            i--;
     }
 
-    /*
-    TO DO: Fix Asteroids class to handle different size asteroids
 
     //Place Medium Asteroids on the level field
     for(int i = 0; i < medAst; i++) {
+        //Set asteroid parameters randomly on the field (xCoord, yCoord, angle)
         x = rand() % 800;
         y = rand() % 600;
         ang = rand() % 360;
+        spd = (rand() % 3) + 1;
+        add = true;
+
         //If outside the safe zone add
-        if((x < 300 || x > 500) || (y < 200 || y > 400)) {
-            Asteroid* ast = new Asteroid(x, y, ang);
-            asteroids.push_back(ast);
+        if((x < 300 || x > 500) || (y < 150 || y > 450)) {
+            Asteroid* ast = new Asteroid(x, y, ang, spd, "Medium");
+            //Add first asteroid
+            if(asteroids.empty()) {
+                asteroids.push_back(ast);
+                continue;
+            }
+            //Check all asteroids in asteroids list
+            for(astIt = asteroids.begin(); astIt != asteroids.end(); ++astIt) {
+                //Add new asteroid to the list if it does not overlap the previous
+                if(!((ast->getXCoord() < (*astIt)->getXCoord()-128 ||
+                   ast->getXCoord() > (*astIt)->getXCoord()+128) ||
+                   (ast->getYCoord() < (*astIt)->getYCoord()-128 ||
+                   ast->getYCoord() > (*astIt)->getYCoord()+128)))
+                {
+                    add = false;
+                    break;
+                }
+            }
+            if(add == true)
+                asteroids.push_back(ast);
+            else
+                i--;
         }
-        //if collide with another asteroid retry
-        //else retry a new position
+        else
+            i--;
     }
+
     //Place Small Asteroids on the level field
-    for(int i = 0; i < smallAst; i++) {
+    //Place Large Asteroids on the level field
+    for(int i = 0; i < smlAst; i++) {
+        //Set asteroid parameters randomly on the field (xCoord, yCoord, angle)
         x = rand() % 800;
         y = rand() % 600;
         ang = rand() % 360;
+        spd = (rand() % 3) + 1;
+        add = true;
+
         //If outside the safe zone add
-        if((x < 300 || x > 500) || (y < 200 || y > 400)) {
-            Asteroid* ast = new Asteroid(x, y, ang);
-            asteroids.push_back(ast);
+        if((x < 300 || x > 500) || (y < 150 || y > 450)) {
+            Asteroid* ast = new Asteroid(x, y, ang, spd, "Small");
+            //Add first asteroid
+            if(asteroids.empty()) {
+                asteroids.push_back(ast);
+                continue;
+            }
+            //Check all asteroids in asteroids list
+            for(astIt = asteroids.begin(); astIt != asteroids.end(); ++astIt) {
+                //Add new asteroid to the list if it does not overlap the previous
+                if(!((ast->getXCoord() < (*astIt)->getXCoord()-128 ||
+                   ast->getXCoord() > (*astIt)->getXCoord()+128) ||
+                   (ast->getYCoord() < (*astIt)->getYCoord()-128 ||
+                   ast->getYCoord() > (*astIt)->getYCoord()+128)))
+                {
+                    add = false;
+                    break;
+                }
+            }
+            if(add == true)
+                asteroids.push_back(ast);
+            else
+                i--;
         }
-        //if collide with another asteroid retry
-        //else retry a new position
+        else
+            i--;
     }
-    */
 
     //Set level start conditions
     countdown = 360;
@@ -397,21 +421,7 @@ void Game::draw() {
     al_draw_bitmap(background, 0, 0, 0);
 
     //Draw the ship
-    ALLEGRO_BITMAP* rotated = NULL;
-    rotated = al_create_bitmap(32, 48);
-    al_set_target_bitmap(rotated);
-    al_clear_to_color(al_map_rgb(0,0,0));
-    al_draw_bitmap_region(player->getBitmap(),
-        shipFrameX, shipFrameY, 32, 48, 0, 0, 0);
-    al_convert_mask_to_alpha(rotated, al_map_rgb(0,0,0));
-    al_set_target_bitmap(al_get_backbuffer(display));
-    al_draw_rotated_bitmap(rotated,
-                   al_get_bitmap_width(rotated)/2,
-                   al_get_bitmap_height(rotated)/2,
-                   player->getXCoord(),
-                   player->getYCoord(),
-                   player->getRadiansAngle(),
-                   0);
+    player->draw(display);
 
     //Draw Asteroids
     std::list<Asteroid*>::iterator astIt;
@@ -434,23 +444,21 @@ void Game::draw() {
                    0);
     }
 
-    //Draw Lasers
-    std::list<Laser*>::iterator it;
-    for(it = lasers.begin(); it != lasers.end(); ++it) {
-        al_draw_rotated_bitmap((*it)->getBitmap(),
-                   al_get_bitmap_width((*it)->getBitmap())/2,
-                   al_get_bitmap_height((*it)->getBitmap())/2,
-                   (*it)->getXCoord(),
-                   (*it)->getYCoord(),
-                   (*it)->getRadiansAngle(),
+    std::list<Weapon*>::iterator itWeap;
+    for(itWeap = weapons.begin(); itWeap != weapons.end(); ++itWeap) {
+        al_draw_rotated_bitmap((*itWeap)->getBitmap(),
+                   al_get_bitmap_width((*itWeap)->getBitmap())/2,
+                   al_get_bitmap_height((*itWeap)->getBitmap())/2,
+                   (*itWeap)->getXCoord(),
+                   (*itWeap)->getYCoord(),
+                   (*itWeap)->getRadiansAngle(),
                    0);
     }
 
     //Draw HUD
     al_draw_bitmap(hud, 0, 600, 0);
-    al_draw_rectangle(200, 625, 600, 675, al_map_rgb(0,0,0), 2);
-    al_draw_filled_rectangle(200, 625, 200+energy*4, 675,al_map_rgb(0,0,150));
-    al_draw_bitmap(rotated, 30, 634, 0);
+    al_draw_rectangle(200, 625, 600, 650, al_map_rgb(0,0,0), 2);
+    al_draw_filled_rectangle(200, 625, 200+player->getEnergy()*4, 650,al_map_rgb(0,0,150));
     std::stringstream ss;
     std::string str;
     const char* cstrLives;
@@ -464,11 +472,6 @@ void Game::draw() {
     str = "Score: " + ss.str();
     cstrScore = str.c_str();
     al_draw_text(font, al_map_rgb(255,255,255), 630, 634, ALLEGRO_ALIGN_LEFT, cstrScore);
-
-    //Draw Text
-
-    //Destroy temporary bitmaps
-    al_destroy_bitmap(rotated);
 
     if(setTimer == true) {
         const char* cstrCountdown;

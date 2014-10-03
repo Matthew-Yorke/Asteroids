@@ -18,7 +18,7 @@ class Asteroid{
         void screenEdgeCollision();            //Check if the ship touches edge of screen
     public:
         //Constructor
-        Asteroid(float, float, float);         //Constructor
+        Asteroid(float, float, float, int, std::string);         //Constructor
         //Computational
         void moveForward();                    //Propels asteroid forward at it's angle
         //Getters
@@ -33,15 +33,17 @@ class Asteroid{
 };
 
 //Constructor
-Asteroid::Asteroid(float x, float y, float a) {
-    asteroidImg = al_load_bitmap("Images/Asteroid_Large.png");          //Sets image
+Asteroid::Asteroid(float x, float y, float a, int spd, std::string astSize) {
+    std::string str = "Images/Asteroid_" + astSize + ".png";
+    const char* cStr = str.c_str();
+    asteroidImg = al_load_bitmap(cStr);          //Sets image
     al_convert_mask_to_alpha(asteroidImg, al_map_rgb(255,255,255));     //Mask the white background of the asteroidImg
     xCoord = x;                                                         //Sets xCoord from x variable passed in
     yCoord = y;                                                         //Sets yCoord from y variable passed in
     angle = a;                                                          //Sets angle from a variable passed in
+    speed = spd;                                                        //Sets speed from spd variable passed in
     rotation = 0;                                                       //Default rotation to 0
     health = 1;                                                         //Default health to 1
-    speed = 2;                                                          //Default speed to 2
 }
 
 //Moves ship forward based on the angle of the image
